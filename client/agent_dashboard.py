@@ -30,11 +30,11 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 
-load_dotenv()  # script client - jamais couvert par le load_dotenv() de api/dotnetApi.py
+load_dotenv()  # script client - jamais couvert par le load_dotenv() de api/myApi.py
 
 MCP_SERVER_URL = "http://127.0.0.1:8000/mcp"   # doit correspondre à server.py
 MODEL = "gemini-2.5-flash"
-OUTPUT_HTML = Path("dashboard_infosoft.html")
+OUTPUT_HTML = Path("dashboard_africa.html")
 MAX_STEPS = 8   # garde-fou contre une boucle infinie de l'agent
 
 SKILL_PATH = Path(__file__).parent.parent / "skills" / "skill-orchestrateur-agent.md"

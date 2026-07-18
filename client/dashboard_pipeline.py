@@ -18,7 +18,7 @@ from fastmcp import Client
 from google import genai
 from dotenv import load_dotenv
 
-load_dotenv()  # script client - jamais couvert par le load_dotenv() de api/dotnetApi.py
+load_dotenv()  # script client - jamais couvert par le load_dotenv() de api/myApi.py
 
 MCP_SERVER_URL = "http://127.0.0.1:8000/mcp"   # doit correspondre à server.py
 MODEL = "gemini-2.5-flash"
@@ -89,7 +89,7 @@ async def build_dashboard_from_dates(date_debut: str, date_fin: str) -> str | No
         html_result = await client.call_tool(
             "generate_dashboard_html",
             {
-                "title": f"Dashboard InfoSoft — CA par famille ({date_debut} au {date_fin})",
+                "title": f"Dashboard  — CA par famille ({date_debut} au {date_fin})",
                 "kpi_table": kpi_table,
                 "insights": insights,
             },

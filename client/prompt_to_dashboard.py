@@ -16,7 +16,7 @@ from pathlib import Path
 
 from dashboard_pipeline import build_dashboard_from_prompt
 
-OUTPUT_HTML = Path("dashboard_infosoft.html")
+OUTPUT_HTML = Path("dashboard_africa.html")
 
 
 async def main(prompt: str):

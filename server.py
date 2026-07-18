@@ -5,15 +5,16 @@ from tools import kpi_agregation, insights, dashboard_html
 
 mcp_server = FastMCP("AFRIKA-DASHBOARD")
 
-kpi_agregation.register_tools(mcp_server)   # Skill 2 : get_kpi_par_famille, get_kpi, get_produits_par_client
-insights.register_tools(mcp_server)         # Skill 3 : generate_insights
-dashboard_html.register_tools(mcp_server)   # Skills 4+5 : generate_dashboard_html
+kpi_agregation.register_tools(mcp_server)   
+insights.register_tools(mcp_server)         
+dashboard_html.register_tools(mcp_server)   
 
-
+# Cette chaîne "skills://dashboard-insights" est le nom sous lequel la ressource est exposée aux clients MCP
 @mcp_server.resource("skills://dashboard-insights")
 def skill_dashboard_insights() -> str:
-    """Retourne le contenu du skill Dashboard InfoSoft pour un agent client."""
-    return Path("skills-dashboard-infosoft.md").read_text(encoding="utf-8")
+    """Retourne le contenu du skill Dashboard pour un agent client."""
+    # Le contenu de la ressource est lu depuis le fichier "skills-dashboard.md" et renvoyé au client. La fonction retourne :
+    return Path("skills-dashboard.md").read_text(encoding="utf-8")
 
 
 async def main():

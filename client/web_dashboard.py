@@ -23,7 +23,7 @@ WEB_PORT = 8080
 
 FORM_PAGE = """<!DOCTYPE html>
 <html lang="fr"><head><meta charset="utf-8">
-<title>Dashboard InfoSoft</title>
+<title>Dashboard </title>
 <style>
 body {{ font-family: sans-serif; background:#0A1628; color:#fff; padding:40px; }}
 form {{ background:#0F2038; padding:24px; border-radius:10px; max-width:520px; }}
@@ -32,13 +32,12 @@ textarea {{ width:100%; padding:10px; margin-top:4px; border-radius:6px; border:
 button {{ margin-top:20px; padding:10px 20px; background:#00C4CC; color:#0A1628; border:none; border-radius:6px; font-weight:bold; cursor:pointer; }}
 .exemples {{ margin-top:16px; font-size:12px; color:#8FA3C0; }}
 </style></head><body>
-<h2>Dashboard InfoSoft — décrivez ce que vous voulez voir</h2>
+<h2>Dashboard — décrivez ce que vous voulez voir</h2>
 <form action="/dashboard" method="get">
   <label>Votre demande (n'importe laquelle)</label>
   <textarea name="prompt" rows="3" required placeholder="ex. les produits achetés par chaque client en juillet 2024">{prompt}</textarea>
   <button type="submit">Générer le dashboard</button>
 </form>
-<p class="exemples">Exemples : « le CA par famille du mois dernier » &middot; « les produits par client en juillet 2024 » &middot; « que vend-on le plus à CARAT cette année ? »</p>
 </body></html>"""
 
 

@@ -1,14 +1,14 @@
-# Skills — Dashboard InfoSoft (Sage 100C)
+# Skills — Dashboard 
 
-Ce fichier regroupe les 5 skills nécessaires à la construction du dashboard décisionnel InfoSoft, dans l'ordre où l'agent LangGraph les exécute : Extraction → Agrégation → Insights → Visualisation → Mise en page.
+Ce fichier regroupe les 5 skills nécessaires à la construction du dashboard décisionnel , dans l'ordre où l'agent LangGraph les exécute : Extraction → Agrégation → Insights → Visualisation → Mise en page.
 
 ---
 
-# Skill: Extraction InfoSoft (MCP)
+# Skill: Extraction  (MCP)
 
 ## Role
 
-Tu es l'agent responsable de la récupération des données brutes depuis le système InfoSoft (Sage 100C) via le serveur MCP. Tu ne réalises aucune analyse : ton unique responsabilité est d'aller chercher la bonne donnée, au bon endroit, sans la transformer.
+Tu es l'agent responsable de la récupération des données brutes depuis le système via le serveur MCP. Tu ne réalises aucune analyse : ton unique responsabilité est d'aller chercher la bonne donnée, au bon endroit, sans la transformer.
 
 ## Objective
 
@@ -52,7 +52,7 @@ Un DataFrame (ou une liste de dicts JSON), avec les colonnes d'origine renvoyée
 
 ## Role
 
-Tu es l'agent responsable de transformer les données brutes InfoSoft (issues du skill Extraction) en un tableau de KPIs compact, exploitable par le skill Génération d'Insights.
+Tu es l'agent responsable de transformer les données brutes  (issues du skill Extraction) en un tableau de KPIs compact, exploitable par le skill Génération d'Insights.
 
 ## Objective
 
@@ -60,7 +60,7 @@ Réduire un ensemble de données brutes (potentiellement plusieurs milliers de l
 
 ## Inputs
 
-- Le ou les DataFrame(s) brut(s) produits par le skill Extraction InfoSoft (MCP)
+- Le ou les DataFrame(s) brut(s) produits par le skill Extraction  (MCP)
 - `axe_analyse` (famille | client | periode) — l'angle sous lequel grouper les données
 - `kpis_demandes` (optionnel) — liste des indicateurs à calculer ; si absent, calculer les KPIs standards (CA, %, stock)
 
@@ -106,7 +106,7 @@ Tu es un analyste business senior pour un distributeur. Ton rôle est d'interpr�
 
 ## Objective
 
-Identifier, à partir des KPIs fournis par le skill Agrégation KPI, les points clés, les anomalies et les recommandations qui permettront à un décideur InfoSoft d'agir rapidement, sans avoir à relire lui-même l'ensemble des données.
+Identifier, à partir des KPIs fournis par le skill Agrégation KPI, les points clés, les anomalies et les recommandations qui permettront à un décideur  d'agir rapidement, sans avoir à relire lui-même l'ensemble des données.
 
 ## Inputs
 

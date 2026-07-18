@@ -4,7 +4,7 @@ from pathlib import Path
 async def get_ecom_commandes(date_debut: str = None, date_fin: str = None) -> list[dict]:
     """Retourne les lignes de commandes e-commerce brutes."""
    
-    # 1. Trouver le dossier où se situe dotnetApi.py (le dossier 'api')
+    # 1. Trouver le dossier où se situe myApi.py (le dossier 'api')
     CURRENT_DIR = Path(__file__).resolve().parent
 
     # 2. Remonter d'un cran à la racine, puis va dans 'csv'

@@ -1,6 +1,6 @@
 import pandas as pd
 from fastmcp import FastMCP
-from api import dotnetApi  # Assurez-vous d'y avoir ajouté la fonction ci-dessus
+from api import myApi  # Assurez-vous d'y avoir ajouté la fonction ci-dessus
 
 def register_tools(mcp: FastMCP):
 
@@ -15,7 +15,7 @@ def register_tools(mcp: FastMCP):
         if dimension not in valid_dimensions:
             raise ValueError(f"dimension doit être l'une des suivantes : {valid_dimensions}")
 
-        commandes = await dotnetApi.get_ecom_commandes(date_debut, date_fin)
+        commandes = await myApi.get_ecom_commandes(date_debut, date_fin)
         if not commandes:
             return []
 
@@ -55,7 +55,7 @@ def register_tools(mcp: FastMCP):
         """
         Détaille les produits achetés par client avec le CA Net et la quantité.
         """
-        commandes = await dotnetApi.get_ecom_commandes(date_debut, date_fin)
+        commandes = await myApi.get_ecom_commandes(date_debut, date_fin)
         if not commandes:
             return []
 
