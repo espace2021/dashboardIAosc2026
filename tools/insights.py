@@ -14,6 +14,9 @@ import time
 from pathlib import Path
 from google import genai
 from fastmcp import FastMCP
+from dotenv import load_dotenv
+
+load_dotenv()
 
 SKILL_PATH = Path(__file__).parent.parent / "skills" / "skill-3-generation-insights.md"
 

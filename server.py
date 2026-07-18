@@ -2,6 +2,9 @@ import asyncio
 from pathlib import Path
 from fastmcp import FastMCP
 from tools import kpi_agregation, insights, dashboard_html
+from dotenv import load_dotenv
+
+load_dotenv()
 
 mcp_server = FastMCP("AFRIKA-DASHBOARD")
 
