@@ -1,108 +1,314 @@
 """
-dashboard_pipeline.py (version Gemini)
-Logique partagée par web_dashboard.py et prompt_to_dashboard.py :
-1) interprète une demande en langage naturel pour en extraire une période de dates
-   (Skill 0 - Interprétation de la demande, via Gemini)
-2) exécute la chaîne de tools MCP existante :
-       get_kpi_par_famille -> generate_insights -> generate_dashboard_html
+dashboard_pipeline.py
 
-Prérequis : le serveur MCP doit déjà tourner (uv run server.py).
+Pipeline partagé par :
+- web_dashboard.py
+- prompt_to_dashboard.py
+
+Flux :
+
+1) Prompt utilisateur
+        |
+        |
+   Skill 0 - interprétation demande
+        |
+        |
+   Extraction dates JSON
+        |
+        |
+2) Tools MCP :
+        |
+        +--> get_kpi_par_famille
+        |
+        +--> generate_insights
+        |
+        +--> generate_dashboard_html
+
+
+Gemini est appelé via :
+services/gemini_service.py
+(ChatGoogleGenerativeAI)
 """
-import os
+
+
 import json
-import time
 import datetime as dt
+
 from pathlib import Path
 
 from fastmcp import Client
-from google import genai
+
+from services.gemini_service import call_gemini_json
+
 from dotenv import load_dotenv
 
-load_dotenv()  # script client - jamais couvert par le load_dotenv() de api/myApi.py
 
-MCP_SERVER_URL = "http://127.0.0.1:8000/mcp"   # doit correspondre à server.py
-MODEL = "gemini-2.5-flash"
-
-SKILL_0_PATH = Path(__file__).parent.parent / "skills" / "skill-0-interpretation-demande.md"
+load_dotenv()
 
 
-def _call_gemini_with_retry(fn, *args, max_retries=4, base_delay=3, **kwargs):
-    """Réessaie automatiquement en cas d'indisponibilité temporaire de l'API Gemini."""
-    for attempt in range(max_retries):
-        try:
-            return fn(*args, **kwargs)
-        except Exception as exc:
-            transient = any(s in str(exc) for s in ("503", "UNAVAILABLE", "overloaded", "429", "rate_limit"))
-            if not transient or attempt == max_retries - 1:
-                raise
-            delay = base_delay * (2 ** attempt)
-            print(f"   (Gemini temporairement surchargé, nouvel essai dans {delay}s...)")
-            time.sleep(delay)
+
+MCP_SERVER_URL = (
+    "http://127.0.0.1:8000/mcp"
+)
 
 
-def extract_dates_from_prompt(prompt: str) -> dict:
-    """Utilise Gemini (skill skill-0-interpretation-demande.md) pour transformer une demande en {date_debut, date_fin}."""
-    client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
-    system_prompt = SKILL_0_PATH.read_text(encoding="utf-8")
-    aujourdhui = dt.date.today().isoformat()
-    user_message = f'Nous sommes aujourd\'hui le {aujourdhui}.\n\nDemande : "{prompt}"'
+SKILL_0_PATH = (
+    Path(__file__).parent.parent
+    / "skills"
+    / "skill-0-interpretation-demande.md"
+)
 
-    response = _call_gemini_with_retry(
-        client.models.generate_content,
-        model=MODEL,
-        contents=f"{system_prompt}\n\n{user_message}",
-        config={"temperature": 0, "response_mime_type": "application/json"},
+
+
+# ==================================================
+# Skill 0 : interprétation de la demande utilisateur
+# ==================================================
+
+
+def extract_dates_from_prompt(
+        prompt: str
+) -> dict:
+    """
+    Transforme une demande naturelle en :
+
+    {
+       "date_debut": "2024-07-01",
+       "date_fin": "2024-07-31"
+    }
+
+    grâce au Skill 0.
+    """
+
+
+    system_prompt = SKILL_0_PATH.read_text(
+        encoding="utf-8"
     )
-    return json.loads(response.text)
+
+
+    aujourd_hui = dt.date.today().isoformat()
+
+
+    user_message = f"""
+Nous sommes aujourd'hui le {aujourd_hui}.
+
+
+Demande utilisateur :
+
+{prompt}
+"""
+
+
+    full_prompt = f"""
+
+{system_prompt}
+
+
+{user_message}
+
+
+Retourne uniquement un JSON valide :
+
+{{
+ "date_debut": "YYYY-MM-DD",
+ "date_fin": "YYYY-MM-DD"
+}}
+
+"""
+
+
+    return call_gemini_json(
+        full_prompt,
+        model="gemini-2.5-flash",
+        temperature=0
+    )
+
+
+
+# ==================================================
+# Extraction résultat MCP
+# ==================================================
 
 
 def _extract_tool_result(result):
-    """
-    Récupère la donnée renvoyée par un tool MCP, quelle que soit la forme
-    exacte du résultat selon la version de fastmcp.
-    """
-    if getattr(result, "data", None) is not None:
+
+
+    if getattr(
+        result,
+        "data",
+        None
+    ) is not None:
+
         return result.data
-    if getattr(result, "structured_content", None) is not None:
+
+
+
+    if getattr(
+        result,
+        "structured_content",
+        None
+    ) is not None:
+
         return result.structured_content
+
+
+
     text = result.content[0].text
+
+
     try:
+
         return json.loads(text)
-    except (json.JSONDecodeError, TypeError):
+
+
+    except (
+        json.JSONDecodeError,
+        TypeError
+    ):
+
         return text
 
 
-async def build_dashboard_from_dates(date_debut: str, date_fin: str) -> str | None:
-    """Exécute get_kpi_par_famille -> generate_insights -> generate_dashboard_html. None si aucune donnée."""
-    async with Client(MCP_SERVER_URL) as client:
+
+
+# ==================================================
+# Construction Dashboard
+# ==================================================
+
+
+async def build_dashboard_from_dates(
+        date_debut: str,
+        date_fin: str
+) -> str | None:
+
+    """
+    Pipeline MCP :
+
+    get_kpi_par_famille
+          |
+    generate_insights
+          |
+    generate_dashboard_html
+    """
+
+
+    async with Client(
+        MCP_SERVER_URL
+    ) as client:
+
+
+
+        # -------------------------------
+        # 1 - Récupération KPI
+        # -------------------------------
+
         kpi_result = await client.call_tool(
-            "get_kpi_par_famille", {"date_debut": date_debut, "date_fin": date_fin}
+            "get_kpi_par_famille",
+            {
+                "date_debut": date_debut,
+                "date_fin": date_fin
+            }
         )
-        kpi_table = _extract_tool_result(kpi_result)
+
+
+        kpi_table = _extract_tool_result(
+            kpi_result
+        )
+
 
         if not kpi_table:
+
             return None
 
-        insights_result = await client.call_tool("generate_insights", {"kpi_table": kpi_table})
-        insights = _extract_tool_result(insights_result)
+
+
+        # -------------------------------
+        # 2 - Analyse KPI
+        # -------------------------------
+
+        insights_result = await client.call_tool(
+            "generate_insights",
+            {
+                "kpi_table": kpi_table,
+                "axe_analyse": "par famille d'articles"
+            }
+        )
+
+
+        insights = _extract_tool_result(
+            insights_result
+        )
+
+
+
+        # -------------------------------
+        # 3 - Génération HTML
+        # -------------------------------
 
         html_result = await client.call_tool(
             "generate_dashboard_html",
             {
-                "title": f"Dashboard  — CA par famille ({date_debut} au {date_fin})",
-                "kpi_table": kpi_table,
-                "insights": insights,
-            },
+
+                "title":
+                (
+                    "Dashboard CA par famille "
+                    f"({date_debut} au {date_fin})"
+                ),
+
+
+                "kpi_table":
+                kpi_table,
+
+
+                "insights":
+                insights
+
+            }
         )
-        return _extract_tool_result(html_result)
 
 
-async def build_dashboard_from_prompt(prompt: str) -> tuple[str | None, dict]:
+        return _extract_tool_result(
+            html_result
+        )
+
+
+
+
+
+# ==================================================
+# Pipeline complet
+# ==================================================
+
+
+async def build_dashboard_from_prompt(
+        prompt: str
+) -> tuple[str | None, dict]:
+
     """
-    Pipeline complet : prompt -> dates -> dashboard HTML.
-    Retourne (html_ou_None, dates_utilisees) pour que l'appelant puisse toujours
-    afficher la période interprétée, même quand le dashboard est vide.
+    Prompt utilisateur :
+
+    "donne-moi le CA de juillet 2024"
+
+    devient :
+
+    {
+       date_debut,
+       date_fin
+    }
+
+
+    puis génère le dashboard.
     """
-    dates = extract_dates_from_prompt(prompt)
-    html = await build_dashboard_from_dates(dates["date_debut"], dates["date_fin"])
+
+
+    dates = extract_dates_from_prompt(
+        prompt
+    )
+
+
+    html = await build_dashboard_from_dates(
+        dates["date_debut"],
+        dates["date_fin"]
+    )
+
+
     return html, dates

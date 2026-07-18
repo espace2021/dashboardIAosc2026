@@ -26,7 +26,14 @@ You can call the following MCP tools:
 
 1. Lire attentivement l'intégralité du tableau `kpi_table` fourni.
 2. Identifier 2 à 4 constats chiffrés et significatifs (`points_cles`) — privilégier les écarts les plus importants entre lignes.
-3. Repérer les écarts, incohérences ou signaux faibles à signaler (`anomalies`) — retourner une liste vide `[]` si aucune n'est détectée, ne jamais en inventer une pour remplir le champ.
+3. Repérer (`anomalies`) :
+- les valeurs extrêmes par rapport aux autres lignes ;
+- les ratios anormaux (ex: anomalies/quantité vendue élevé) ;
+- les écarts importants entre performance commerciale et coûts ;
+- les villes, produits ou clients sous-performants ;
+- les situations nécessitant une investigation métier.
+- Une anomalie doit être justifiée par un calcul ou un ratio. 
+- retourner une liste vide `[]` si aucune n'est détectée, ne jamais en inventer une pour remplir le champ.
 4. Formuler 1 à 3 recommandations concrètes et réalisables (`recommandations`), directement rattachées à un constat ou une anomalie identifiée.
 5. Relire chaque affirmation produite et vérifier qu'elle est bien appuyée par un chiffre présent dans `kpi_table`, avant de renvoyer la réponse.
 
