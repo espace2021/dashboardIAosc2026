@@ -50,10 +50,10 @@ button {{ margin-top:20px; padding:10px 20px; background:#00C4CC; color:#0A1628;
 .grid {{ display:grid; grid-template-columns:repeat(2, 1fr); gap:16px; margin-top:24px; }}
 @media (max-width: 700px) {{ .grid {{ grid-template-columns:1fr; }} }}
 </style></head><body>
-<h2>Dashboard — décrivez ce que vous voulez voir</h2>
+<h2>Dashboard Afrimarket</h2>
 <form action="/dashboard" method="get">
-  <label>Votre demande (n'importe laquelle)</label>
-  <textarea name="prompt" rows="3" required placeholder="ex. les produits achetés par chaque client en juillet 2024">{prompt}</textarea>
+  <label>Votre demande </label>
+  <textarea name="prompt" rows="3" required placeholder="ex.  Analyse l'impact de nos canaux marketing sur la période du 1er janvier 2024 jusqu'au 15 mai 2026. Donne-moi le pourcentage du CA et le coût marketing associé pour chaque canal.">{prompt}</textarea>
   <button type="submit">Générer le dashboard</button>
 </form>"""
 

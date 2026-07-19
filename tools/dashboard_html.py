@@ -188,19 +188,28 @@ def register_tools(mcp: FastMCP):
         body = f"""<style>
         .card {{ background:#0F2038; border-radius:10px; padding:16px; margin-bottom:16px; }}
         .chart-wrap {{ position:relative; height:220px; width:100%; }}
-        .grid {{ display:grid; grid-template-columns:repeat(2, 1fr); gap:16px; }}
+        .grid {{ display:grid; grid-template-columns:1fr; gap:16px; }}
         @media (max-width: 700px) {{ .grid {{ grid-template-columns:1fr; }} }}
         .chart-toggle {{ display:flex; gap:16px; font-size:13px; color:#8FA3C0; margin-bottom:8px; }}
         .chart-toggle label {{ display:flex; align-items:center; gap:4px; cursor:pointer; }}
         .tabs {{ display:flex; gap:8px; margin-bottom:20px; border-bottom:1px solid #22385A; }}
-        .tab-btn {{ background:none; border:none; color:#8FA3C0; padding:10px 16px; cursor:pointer; font-size:14px; border-bottom:2px solid transparent; }}
-        .tab-btn.active {{ color:#00C4CC; border-bottom:2px solid #00C4CC; }}
-        .tab-pane {{ display:none; }}
-        .tab-pane.active {{ display:block; }}
-        </style>
-        <div class="tabs">{"".join(tab_buttons)}</div>
-        {"".join(tab_panes)}
-        {tabs_script}{"".join(scripts)}"""
+        .tab-btn {{
+        background:none;
+        border:none;
+        color:#8FA3C0;
+        padding:16px 28px;        /* était 10px 16px → zone cliquable plus grande */
+        cursor:pointer;
+        font-size:16px;           /* était 14px */
+        font-weight:600;
+        border-bottom:3px solid transparent;  /* était 2px, plus visible */
+        }}
+        .tab-btn.active {{ color:#00C4CC; border-bottom:3px solid #00C4CC; }}
+                .tab-pane {{ display:none; }}
+                .tab-pane.active {{ display:block; }}
+                </style>
+                <div class="tabs">{"".join(tab_buttons)}</div>
+                {"".join(tab_panes)}
+                {tabs_script}{"".join(scripts)}"""
 
         if not standalone:
                 return body
