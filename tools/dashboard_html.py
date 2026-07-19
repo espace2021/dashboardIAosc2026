@@ -138,6 +138,12 @@ def register_tools(mcp: FastMCP):
             <b>Tendance de {value_field}</b>
             <div class="chart-wrap"><canvas id="chart_line"></canvas></div>
         </div>
+        <div class="card">
+        <b>Répartition de {value_field}</b>
+        <div class="chart-wrap">
+            <canvas id="chart_donut"></canvas>
+        </div>
+        </div>
         </div>
         <script>
         new Chart(document.getElementById('chart_bar'), {{
@@ -167,6 +173,28 @@ def register_tools(mcp: FastMCP):
             plugins: {{ legend: {{ display: false }} }}
         }}
         }});
+
+        new Chart(document.getElementById('chart_donut'), {{
+            type: 'doughnut',
+            data: {{
+                labels: {json.dumps(labels)},
+                datasets: [{{
+                    data: {json.dumps(values)},
+                    backgroundColor: {json.dumps(colors)},
+                    borderWidth: 1
+                }}]
+            }},
+            options: {{
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '65%',          // taille du trou
+                plugins: {{
+                    legend: {{
+                        position: 'right'
+                    }}
+                }}
+            }}
+        }});
         </script>"""
             else:
                 charts_html = ""
@@ -194,7 +222,7 @@ def register_tools(mcp: FastMCP):
     @mcp.tool()
     async def generate_multi_dashboard_html(
         title: str,
-        sections: list[dict],   # [{ "label": str, "kpi_table": list[dict], "chart_type": "bar"|"pie", "theme": str }, ...]
+        sections: list[dict],   # [{ "label": str, "kpi_table": list[dict], "chart_type": "bar"|"pie"|"donut", "theme": str }, ...]
         standalone: bool = True
     ) -> str:
         """

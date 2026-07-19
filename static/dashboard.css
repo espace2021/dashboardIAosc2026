@@ -12,7 +12,7 @@ body { font-family: sans-serif; background:#0A1628; color:#fff; padding:24px; }
 .tab-pane.active { display:block; }
 
 /* --- generate_dashboard_html : page 2 --- */
-.charts-row { display:grid; grid-template-columns:repeat(2, 1fr); gap:16px; margin-bottom:16px; }
+.charts-row { display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; margin-bottom:16px; }
 @media (max-width: 700px) { .charts-row { grid-template-columns:1fr; } }
 .chart-wrap { position:relative; height:300px; width:100%; }
 
