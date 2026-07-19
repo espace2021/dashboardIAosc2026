@@ -21,8 +21,49 @@ def _detect_label_value(row: dict) -> tuple[str | None, str | None]:
             value_field = k
     return label_field, value_field
 
+# méthode interne pour générer un graphique Chart.js à partir d'un tableau de données
+def _build_chart(chart_id: str, kpi_table: list[dict], chart_type: str = "bar") -> tuple[str, str]:
+    if not kpi_table:
+        return "<p>Aucune donnée.</p>", ""
+    label_field, value_field = _detect_label_value(kpi_table[0])
+    if not (label_field and value_field):
+        return "<p>Pas de graphique pertinent pour ces données.</p>", ""
+
+    labels = [str(r.get(label_field, "")) for r in kpi_table[:8]]
+    values = [r.get(value_field, 0) for r in kpi_table[:8]]
+
+    # Wrapper à hauteur fixe : Chart.js se cale sur ce conteneur, pas sur le CSS du canvas
+    canvas = f'<div class="chart-wrap"><canvas id="{chart_id}"></canvas></div>'
+
+    palette = ["#00C4CC", "#F2A900", "#E85D75", "#7B68EE", "#4CAF50", "#FF7043", "#42A5F5", "#AB47BC"]
+    colors = palette[: len(values)]
+
+    if chart_type == "pie":
+        dataset = f'{{ label: {json.dumps(value_field)}, data: {json.dumps(values)}, backgroundColor: {json.dumps(colors)} }}'
+        legend = '{ display: true, position: "right" }'
+    else:
+        dataset = f'{{ label: {json.dumps(value_field)}, data: {json.dumps(values)}, backgroundColor: {json.dumps(colors)} }}'
+        legend = '{ display: false }'
+
+    script = f"""new Chart(document.getElementById('{chart_id}'), {{
+      type: {json.dumps(chart_type)},
+      data: {{ labels: {json.dumps(labels)}, datasets: [{dataset}] }},
+      options: {{
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {{ legend: {legend} }}
+      }}
+    }});"""
+    return canvas, script
+
 
 def register_tools(mcp: FastMCP):
+
+    """Enregistre les outils de génération de dashboard HTML dans le MCP."""
+
+    #=====================================================
+    # Tool 1 Génération de dashboard HTML autonome (Chart.js + tableau)
+    #=====================================================
 
     @mcp.tool()
     async def generate_dashboard_html(title: str, kpi_table: list[dict], insights: dict) -> str:
@@ -64,19 +105,59 @@ new Chart(document.getElementById('chart'), {{
                 chart_script = ""
 
         html = f"""<!DOCTYPE html>
-<html lang="fr"><head><meta charset="utf-8">
-<style>
-body {{ font-family: sans-serif; background:#0A1628; color:#fff; padding:24px; }}
-.card {{ background:#0F2038; border-radius:10px; padding:16px; margin-bottom:16px; overflow-x:auto; }}
-table {{ width:100%; border-collapse:collapse; font-size:13px; }}
-th, td {{ text-align:left; padding:6px 10px; border-bottom:1px solid #22385A; white-space:nowrap; }}
-th {{ color:#8FA3C0; }}
-</style></head><body>
-<h2>{title}</h2>
-{chart_script}
-<div class="card"><b>Points clés</b><ul>{"".join(f"<li>{p}</li>" for p in insights.get("points_cles", []))}</ul></div>
-<div class="card"><b>Anomalies</b><ul>{"".join(f"<li>{a}</li>" for a in insights.get("anomalies", []))}</ul></div>
-<div class="card"><b>Recommandations</b><ul>{"".join(f"<li>{r}</li>" for r in insights.get("recommandations", []))}</ul></div>
-<div class="card">{rows_html}</div>
-</body></html>"""
+                <html lang="fr"><head><meta charset="utf-8">
+                <style>
+                body {{ font-family: sans-serif; background:#0A1628; color:#fff; padding:24px; }}
+                .card {{ background:#0F2038; border-radius:10px; padding:16px; margin-bottom:16px; overflow-x:auto; }}
+                table {{ width:100%; border-collapse:collapse; font-size:13px; }}
+                th, td {{ text-align:left; padding:6px 10px; border-bottom:1px solid #22385A; white-space:nowrap; }}
+                th {{ color:#8FA3C0; }}
+                </style></head><body>
+                <h2>{title}</h2>
+                {chart_script}
+                <div class="card"><b>Points clés</b><ul>{"".join(f"<li>{p}</li>" for p in insights.get("points_cles", []))}</ul></div>
+                <div class="card"><b>Anomalies</b><ul>{"".join(f"<li>{a}</li>" for a in insights.get("anomalies", []))}</ul></div>
+                <div class="card"><b>Recommandations</b><ul>{"".join(f"<li>{r}</li>" for r in insights.get("recommandations", []))}</ul></div>
+                <div class="card">{rows_html}</div>
+                </body></html>"""
         return html
+
+    #=====================================================
+    # Tool 2 Génération de dashboard HTML multi-sections (Chart.js + tableau)
+    #=====================================================
+
+    @mcp.tool()
+    async def generate_multi_dashboard_html(
+        title: str,
+        sections: list[dict],   # [{ "label": str, "kpi_table": list[dict], "chart_type": "bar"|"pie" }, ...]
+        standalone: bool = True
+        ) -> str:
+            """
+            Génère un dashboard avec plusieurs graphiques (un par section), 2 par ligne.
+            Chaque section peut préciser "chart_type" ("bar" ou "pie") ; si absent,
+            alterne automatiquement bar/pie pour varier les styles.
+            Si standalone=False, ne renvoie que le fragment interne.
+            """
+            cards, scripts = [], ['<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>']
+
+            for i, section in enumerate(sections):
+                chart_type = section.get("chart_type") or ("pie" if i % 2 == 0 else "bar")
+                canvas_html, script_js = _build_chart(f"chart_{i}", section.get("kpi_table", []), chart_type)
+                cards.append(f'<div class="card"><b>{section.get("label","")}</b>{canvas_html}</div>')
+                if script_js:
+                    scripts.append(f"<script>{script_js}</script>")
+
+            body = f'<div class="grid">{"".join(cards)}</div>{"".join(scripts)}'
+
+            if not standalone:
+                return body
+
+            return f"""<!DOCTYPE html>
+                    <html lang="fr"><head><meta charset="utf-8">
+                    <style>
+                    body {{ font-family: sans-serif; background:#0A1628; color:#fff; padding:24px; }}
+                    .card {{ background:#0F2038; border-radius:10px; padding:16px; margin-bottom:16px; }}
+                    .chart-wrap {{ position:relative; height:220px; width:100%; }}
+                    .grid {{ display:grid; grid-template-columns:repeat(2, 1fr); gap:16px; }}
+                    @media (max-width: 700px) {{ .grid {{ grid-template-columns:1fr; }} }}
+                    </style></head><body><h2>{title}</h2>{body}</body></html>"""

@@ -19,6 +19,18 @@ from urllib.parse import urlparse, parse_qs
 
 from agent_dashboard import run_agent
 
+from fastmcp import Client
+import datetime as dt
+
+MCP_SERVER_URL = "http://127.0.0.1:8000/mcp"
+
+DEFAULT_DIMENSIONS = [
+    ("categorie", "CA par catégorie"),
+    ("ville", "CA par ville"),
+    ("canal_marketing", "CA par canal marketing"),
+    ("statut_commande", "CA par statut de commande"),
+]
+
 WEB_PORT = 8080
 
 FORM_PAGE = """<!DOCTYPE html>
@@ -31,14 +43,19 @@ label {{ display:block; margin-top:12px; font-size:14px; color:#8FA3C0; }}
 textarea {{ width:100%; padding:10px; margin-top:4px; border-radius:6px; border:1px solid #22385A; background:#0A1628; color:#fff; box-sizing:border-box; font-family:inherit; font-size:14px; resize:vertical; }}
 button {{ margin-top:20px; padding:10px 20px; background:#00C4CC; color:#0A1628; border:none; border-radius:6px; font-weight:bold; cursor:pointer; }}
 .exemples {{ margin-top:16px; font-size:12px; color:#8FA3C0; }}
+
+/* --- styles pour le dashboard multi-graphiques inséré ci-dessous --- */
+.card {{ background:#0F2038; border-radius:10px; padding:16px; margin-bottom:16px; }}
+.chart-wrap {{ position:relative; height:220px; width:100%; }}
+.grid {{ display:grid; grid-template-columns:repeat(2, 1fr); gap:16px; margin-top:24px; }}
+@media (max-width: 700px) {{ .grid {{ grid-template-columns:1fr; }} }}
 </style></head><body>
 <h2>Dashboard — décrivez ce que vous voulez voir</h2>
 <form action="/dashboard" method="get">
   <label>Votre demande (n'importe laquelle)</label>
   <textarea name="prompt" rows="3" required placeholder="ex. les produits achetés par chaque client en juillet 2024">{prompt}</textarea>
   <button type="submit">Générer le dashboard</button>
-</form>
-</body></html>"""
+</form>"""
 
 
 def _error_page(message: str) -> str:
@@ -71,9 +88,13 @@ class Handler(BaseHTTPRequestHandler):
         params = parse_qs(parsed.query)
 
         if parsed.path == "/":
-            self._send_html(FORM_PAGE.format(prompt=""))
+            try:
+                default_dashboard = asyncio.run(build_default_dashboard())
+            except Exception as exc:
+                default_dashboard = f"<p style='color:#ff8080'>Vue par défaut indisponible : {exc}</p>"
+            self._send_html(FORM_PAGE.format(prompt="") + default_dashboard + "</body></html>")
             return
-
+        
         if parsed.path == "/dashboard":
             prompt = params.get("prompt", [""])[0].strip()
             if not prompt:
@@ -109,6 +130,29 @@ class Handler(BaseHTTPRequestHandler):
             print("   (connexion interrompue par le client - ignoré)")
 
 
+
+async def build_default_dashboard() -> str:
+    # Dates à adapter dans la plage du dataset 
+    date_debut = "2023-01-01"
+    date_fin = "2025-07-31"
+
+    async with Client(MCP_SERVER_URL) as client:
+        sections = []
+        for dimension, label in DEFAULT_DIMENSIONS:
+            result = await client.call_tool(
+                "get_kpi",
+                {"dimension": dimension, "date_debut": date_debut, "date_fin": date_fin},
+            )
+            kpi_table = result.data if getattr(result, "data", None) is not None else []
+            sections.append({"label": label, "kpi_table": kpi_table})
+
+        result = await client.call_tool(
+            "generate_multi_dashboard_html",
+            {"title": f"Vue d'ensemble ({date_debut} → {date_fin})",
+             "sections": sections, "standalone": False},
+        )
+        return result.data
+    
 if __name__ == "__main__":
     server = ThreadingHTTPServer(("127.0.0.1", WEB_PORT), Handler)
     print(f"Ouvrez http://127.0.0.1:{WEB_PORT} dans votre navigateur (Ctrl+C pour arrêter).")
