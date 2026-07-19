@@ -31,42 +31,29 @@ def _build_chart(chart_id: str, kpi_table: list[dict], chart_type: str = "bar") 
 
     labels = [str(r.get(label_field, "")) for r in kpi_table[:8]]
     values = [r.get(value_field, 0) for r in kpi_table[:8]]
+
+    # Wrapper à hauteur fixe : Chart.js se cale sur ce conteneur, pas sur le CSS du canvas
+    canvas = f'<div class="chart-wrap"><canvas id="{chart_id}"></canvas></div>'
+
     palette = ["#00C4CC", "#F2A900", "#E85D75", "#7B68EE", "#4CAF50", "#FF7043", "#42A5F5", "#AB47BC"]
     colors = palette[: len(values)]
 
-    # --- Boutons radio pour choisir le type de graphique ---
-    radios = f"""
-    <div class="chart-toggle">
-      <label><input type="radio" name="type_{chart_id}" value="bar"
-        {"checked" if chart_type == "bar" else ""}
-        onchange="renderChart_{chart_id}('bar')"> Barres</label>
-      <label><input type="radio" name="type_{chart_id}" value="pie"
-        {"checked" if chart_type == "pie" else ""}
-        onchange="renderChart_{chart_id}('pie')"> Camembert</label>
-    </div>"""
+    if chart_type == "pie":
+        dataset = f'{{ label: {json.dumps(value_field)}, data: {json.dumps(values)}, backgroundColor: {json.dumps(colors)} }}'
+        legend = '{ display: true, position: "right" }'
+    else:
+        dataset = f'{{ label: {json.dumps(value_field)}, data: {json.dumps(values)}, backgroundColor: {json.dumps(colors)} }}'
+        legend = '{ display: false }'
 
-    canvas = f'{radios}<div class="chart-wrap"><canvas id="{chart_id}"></canvas></div>'
-
-    # --- Fonction JS réutilisable : détruit et recrée le chart selon le type choisi ---
-    script = f"""
-            let chartInstance_{chart_id} = null;
-            function renderChart_{chart_id}(type) {{
-            if (chartInstance_{chart_id}) chartInstance_{chart_id}.destroy();
-            chartInstance_{chart_id} = new Chart(document.getElementById('{chart_id}'), {{
-                type: type,
-                data: {{
-                labels: {json.dumps(labels)},
-                datasets: [{{ label: {json.dumps(value_field)}, data: {json.dumps(values)}, backgroundColor: {json.dumps(colors)} }}]
-                }},
-                options: {{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {{ legend: {{ display: type === 'pie', position: 'right' }} }}
-                }}
-            }});
-            }}
-            renderChart_{chart_id}({json.dumps(chart_type)});
-            """
+    script = f"""new Chart(document.getElementById('{chart_id}'), {{
+      type: {json.dumps(chart_type)},
+      data: {{ labels: {json.dumps(labels)}, datasets: [{dataset}] }},
+      options: {{
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {{ legend: {legend} }}
+      }}
+    }});"""
     return canvas, script
 
 
@@ -172,8 +159,5 @@ new Chart(document.getElementById('chart'), {{
                     .card {{ background:#0F2038; border-radius:10px; padding:16px; margin-bottom:16px; }}
                     .chart-wrap {{ position:relative; height:220px; width:100%; }}
                     .grid {{ display:grid; grid-template-columns:repeat(2, 1fr); gap:16px; }}
-                    .chart-toggle {{ display:flex; gap:16px; font-size:13px; color:#8FA3C0; margin-bottom:8px; }}
-                    .chart-toggle label {{ display:flex; align-items:center; gap:4px; cursor:pointer; }}
-                    .chart-toggle input {{ accent-color:#00C4CC; cursor:pointer; }}
                     @media (max-width: 700px) {{ .grid {{ grid-template-columns:1fr; }} }}
                     </style></head><body><h2>{title}</h2>{body}</body></html>"""
