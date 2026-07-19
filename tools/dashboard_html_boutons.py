@@ -49,26 +49,26 @@ def _build_chart(chart_id: str, kpi_table: list[dict], chart_type: str = "bar") 
 
     # --- Fonction JS réutilisable : détruit et recrée le chart selon le type choisi ---
     script = f"""
-            window.__allCharts = window.__allCharts || [];
             let chartInstance_{chart_id} = null;
             function renderChart_{chart_id}(type) {{
             if (chartInstance_{chart_id}) chartInstance_{chart_id}.destroy();
             chartInstance_{chart_id} = new Chart(document.getElementById('{chart_id}'), {{
                 type: type,
-                data: {{ labels: {json.dumps(labels)}, datasets: [{{ label: {json.dumps(value_field)}, data: {json.dumps(values)}, backgroundColor: {json.dumps(colors)} }}] }},
-                options: {{ responsive: true, maintainAspectRatio: false, plugins: {{ legend: {{ display: type === 'pie', position: 'right' }} }} }}
+                data: {{
+                labels: {json.dumps(labels)},
+                datasets: [{{ label: {json.dumps(value_field)}, data: {json.dumps(values)}, backgroundColor: {json.dumps(colors)} }}]
+                }},
+                options: {{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {{ legend: {{ display: type === 'pie', position: 'right' }} }}
+                }}
             }});
-            const idx = window.__allCharts.indexOf(chartInstance_{chart_id});
-            if (idx === -1) window.__allCharts.push(chartInstance_{chart_id});
-            else window.__allCharts[idx] = chartInstance_{chart_id};
             }}
             renderChart_{chart_id}({json.dumps(chart_type)});
             """
     return canvas, script
 
-# -------------------------------------------------------------
-# TOOLS
-# -------------------------------------------------------------
 
 def register_tools(mcp: FastMCP):
 
@@ -105,15 +105,15 @@ def register_tools(mcp: FastMCP):
                 labels = [str(r.get(label_field, "")) for r in kpi_table[:15]]
                 values = [r.get(value_field, 0) for r in kpi_table[:15]]
                 chart_script = f"""
-                <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-                <div class="card"><canvas id="chart"></canvas></div>
-                <script>
-                new Chart(document.getElementById('chart'), {{
-                type: 'bar',
-                data: {{ labels: {json.dumps(labels)}, datasets: [{{ label: {json.dumps(value_field)}, data: {json.dumps(values)} }}] }},
-                options: {{ responsive: true }}
-                }});
-                </script>"""
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<div class="card"><canvas id="chart"></canvas></div>
+<script>
+new Chart(document.getElementById('chart'), {{
+  type: 'bar',
+  data: {{ labels: {json.dumps(labels)}, datasets: [{{ label: {json.dumps(value_field)}, data: {json.dumps(values)} }}] }},
+  options: {{ responsive: true }}
+}});
+</script>"""
             else:
                 chart_script = ""
 
@@ -142,70 +142,38 @@ def register_tools(mcp: FastMCP):
     @mcp.tool()
     async def generate_multi_dashboard_html(
         title: str,
-        sections: list[dict],   # [{ "label": str, "kpi_table": list[dict], "chart_type": "bar"|"pie", "theme": str }, ...]
+        sections: list[dict],   # [{ "label": str, "kpi_table": list[dict], "chart_type": "bar"|"pie" }, ...]
         standalone: bool = True
-    ) -> str:
-        """
-        Génère un dashboard avec plusieurs graphiques, regroupés en onglets par "theme".
-        Si "theme" n'est pas fourni pour une section, son "label" sert de thème
-        (= un onglet par section, comportement actuel).
-        """
-        themes: dict[str, list] = {}
-        for i, section in enumerate(sections):
-            theme = section.get("theme") or section.get("label", f"Section {i}")
-            themes.setdefault(theme, []).append(section)
+        ) -> str:
+            """
+            Génère un dashboard avec plusieurs graphiques (un par section), 2 par ligne.
+            Chaque section peut préciser "chart_type" ("bar" ou "pie") ; si absent,
+            alterne automatiquement bar/pie pour varier les styles.
+            Si standalone=False, ne renvoie que le fragment interne.
+            """
+            cards, scripts = [], ['<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>']
 
-        scripts = ['<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>']
-        tab_buttons, tab_panes = [], []
-
-        for i, (theme, theme_sections) in enumerate(themes.items()):
-            cards = []
-            for j, section in enumerate(theme_sections):
-                chart_id = f"chart_{i}_{j}"
-                chart_type = section.get("chart_type", "bar")
-                canvas_html, script_js = _build_chart(chart_id, section.get("kpi_table", []), chart_type)
+            for i, section in enumerate(sections):
+                chart_type = section.get("chart_type") or ("pie" if i % 2 == 0 else "bar")
+                canvas_html, script_js = _build_chart(f"chart_{i}", section.get("kpi_table", []), chart_type)
                 cards.append(f'<div class="card"><b>{section.get("label","")}</b>{canvas_html}</div>')
                 if script_js:
                     scripts.append(f"<script>{script_js}</script>")
 
-            active = "active" if i == 0 else ""
-            tab_buttons.append(
-                f'<button class="tab-btn {active}" onclick="switchTab(this, \'tab_{i}\')">{theme}</button>'
-            )
-            tab_panes.append(f'<div id="tab_{i}" class="tab-pane {active}"><div class="grid">{"".join(cards)}</div></div>')
+            body = f'<div class="grid">{"".join(cards)}</div>{"".join(scripts)}'
 
-        tabs_script = """
-        <script>
-        function switchTab(btn, paneId) {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById(paneId).classList.add('active');
-        requestAnimationFrame(() => (window.__allCharts || []).forEach(c => c && c.resize()));
-        }
-        </script>"""
-
-        body = f"""<style>
-        .card {{ background:#0F2038; border-radius:10px; padding:16px; margin-bottom:16px; }}
-        .chart-wrap {{ position:relative; height:220px; width:100%; }}
-        .grid {{ display:grid; grid-template-columns:repeat(2, 1fr); gap:16px; }}
-        @media (max-width: 700px) {{ .grid {{ grid-template-columns:1fr; }} }}
-        .chart-toggle {{ display:flex; gap:16px; font-size:13px; color:#8FA3C0; margin-bottom:8px; }}
-        .chart-toggle label {{ display:flex; align-items:center; gap:4px; cursor:pointer; }}
-        .tabs {{ display:flex; gap:8px; margin-bottom:20px; border-bottom:1px solid #22385A; }}
-        .tab-btn {{ background:none; border:none; color:#8FA3C0; padding:10px 16px; cursor:pointer; font-size:14px; border-bottom:2px solid transparent; }}
-        .tab-btn.active {{ color:#00C4CC; border-bottom:2px solid #00C4CC; }}
-        .tab-pane {{ display:none; }}
-        .tab-pane.active {{ display:block; }}
-        </style>
-        <div class="tabs">{"".join(tab_buttons)}</div>
-        {"".join(tab_panes)}
-        {tabs_script}{"".join(scripts)}"""
-
-        if not standalone:
+            if not standalone:
                 return body
 
-        return f"""<!DOCTYPE html>
-        <html lang="fr"><head><meta charset="utf-8"><style>
-        body {{ font-family: sans-serif; background:#0A1628; color:#fff; padding:24px; }}
-        </style></head><body><h2>{title}</h2>{body}</body></html>"""
+            return f"""<!DOCTYPE html>
+                    <html lang="fr"><head><meta charset="utf-8">
+                    <style>
+                    body {{ font-family: sans-serif; background:#0A1628; color:#fff; padding:24px; }}
+                    .card {{ background:#0F2038; border-radius:10px; padding:16px; margin-bottom:16px; }}
+                    .chart-wrap {{ position:relative; height:220px; width:100%; }}
+                    .grid {{ display:grid; grid-template-columns:repeat(2, 1fr); gap:16px; }}
+                    .chart-toggle {{ display:flex; gap:16px; font-size:13px; color:#8FA3C0; margin-bottom:8px; }}
+                    .chart-toggle label {{ display:flex; align-items:center; gap:4px; cursor:pointer; }}
+                    .chart-toggle input {{ accent-color:#00C4CC; cursor:pointer; }}
+                    @media (max-width: 700px) {{ .grid {{ grid-template-columns:1fr; }} }}
+                    </style></head><body><h2>{title}</h2>{body}</body></html>"""
