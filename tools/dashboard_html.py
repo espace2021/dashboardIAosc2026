@@ -84,61 +84,107 @@ def register_tools(mcp: FastMCP):
     # Tool 1 Génération de dashboard HTML autonome (Chart.js + tableau)
     #=====================================================
 
+    def _is_numeric(v) -> bool:
+        return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
     @mcp.tool()
     async def generate_dashboard_html(title: str, kpi_table: list[dict], insights: dict) -> str:
         """
-        Génère un dashboard HTML autonome (Chart.js + tableau) à partir d'un tableau
-        de données quelconque (kpi_table, liste de dicts) et d'une analyse (insights,
-        sortie de generate_insights). `title` doit décrire la demande de l'utilisateur.
-        Détecte automatiquement une colonne "label" et une colonne numérique pour le
-        graphique quand c'est pertinent ; affiche toutes les colonnes dans un tableau.
+        Génère un dashboard HTML autonome (2 graphiques Chart.js : barres + courbe,
+        et un tableau) à partir d'un tableau de données quelconque (kpi_table) et
+        d'une analyse (insights, sortie de generate_insights).
         """
+        css = _load_css()
+
         if not kpi_table:
             rows_html = "<p>Aucune donnée pour cette période / ce filtre.</p>"
-            chart_script = ""
+            charts_html = ""
         else:
             columns = list(kpi_table[0].keys())
             label_field, value_field = _detect_label_value(kpi_table[0])
 
-            header_html = "".join(f"<th>{c}</th>" for c in columns)
+            # --- Table améliorée : alignement à droite pour les colonnes numériques ---
+            numeric_cols = {c for c in columns if _is_numeric(kpi_table[0].get(c))}
+            header_html = "".join(
+                f'<th class="{"num" if c in numeric_cols else ""}">{c}</th>' for c in columns
+            )
             body_html = "".join(
-                "<tr>" + "".join(f"<td>{row.get(c, '')}</td>" for c in columns) + "</tr>"
+                "<tr>" + "".join(
+                    f'<td class="{"num" if c in numeric_cols else ""}">{row.get(c, "")}</td>'
+                    for c in columns
+                ) + "</tr>"
                 for row in kpi_table
             )
             rows_html = f"<table><thead><tr>{header_html}</tr></thead><tbody>{body_html}</tbody></table>"
 
+            # --- 2 graphiques : barres + courbe, sur les mêmes données ---
             if label_field and value_field:
                 labels = [str(r.get(label_field, "")) for r in kpi_table[:15]]
                 values = [r.get(value_field, 0) for r in kpi_table[:15]]
-                chart_script = f"""
-                <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-                <div class="card"><canvas id="chart"></canvas></div>
-                <script>
-                new Chart(document.getElementById('chart'), {{
-                type: 'bar',
-                data: {{ labels: {json.dumps(labels)}, datasets: [{{ label: {json.dumps(value_field)}, data: {json.dumps(values)} }}] }},
-                options: {{ responsive: true }}
-                }});
-                </script>"""
+                palette = ["#00C4CC", "#F2A900", "#E85D75", "#7B68EE", "#4CAF50",
+                        "#FF7043", "#42A5F5", "#AB47BC", "#26A69A", "#EC407A",
+                        "#7E57C2", "#8D6E63", "#5C6BC0", "#66BB6A", "#FFA726"]
+                colors = palette[: len(values)]
+
+                charts_html = f"""
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+        <div class="charts-row">
+        <div class="card">
+            <b>{value_field} par {label_field}</b>
+            <div class="chart-wrap"><canvas id="chart_bar"></canvas></div>
+        </div>
+        <div class="card">
+            <b>Tendance de {value_field}</b>
+            <div class="chart-wrap"><canvas id="chart_line"></canvas></div>
+        </div>
+        </div>
+        <script>
+        new Chart(document.getElementById('chart_bar'), {{
+        type: 'bar',
+        data: {{
+            labels: {json.dumps(labels)},
+            datasets: [{{ label: {json.dumps(value_field)}, data: {json.dumps(values)}, backgroundColor: {json.dumps(colors)} }}]
+        }},
+        options: {{
+            responsive: true, maintainAspectRatio: false,
+            plugins: {{ legend: {{ display: false }} }}
+        }}
+        }});
+
+        new Chart(document.getElementById('chart_line'), {{
+        type: 'line',
+        data: {{
+            labels: {json.dumps(labels)},
+            datasets: [{{
+            label: {json.dumps(value_field)}, data: {json.dumps(values)},
+            borderColor: '#00C4CC', backgroundColor: 'rgba(0,196,204,0.15)',
+            fill: true, tension: 0.3, pointBackgroundColor: '#00C4CC', pointRadius: 4
+            }}]
+        }},
+        options: {{
+            responsive: true, maintainAspectRatio: false,
+            plugins: {{ legend: {{ display: false }} }}
+        }}
+        }});
+        </script>"""
             else:
-                chart_script = ""
+                charts_html = ""
 
         html = f"""<!DOCTYPE html>
-                <html lang="fr"><head><meta charset="utf-8">
-                <style>
-                body {{ font-family: sans-serif; background:#0A1628; color:#fff; padding:24px; }}
-                .card {{ background:#0F2038; border-radius:10px; padding:16px; margin-bottom:16px; overflow-x:auto; }}
-                table {{ width:100%; border-collapse:collapse; font-size:13px; }}
-                th, td {{ text-align:left; padding:6px 10px; border-bottom:1px solid #22385A; white-space:nowrap; }}
-                th {{ color:#8FA3C0; }}
-                </style></head><body>
-                <h2>{title}</h2>
-                {chart_script}
-                <div class="card"><b>Points clés</b><ul>{"".join(f"<li>{p}</li>" for p in insights.get("points_cles", []))}</ul></div>
-                <div class="card"><b>Anomalies</b><ul>{"".join(f"<li>{a}</li>" for a in insights.get("anomalies", []))}</ul></div>
-                <div class="card"><b>Recommandations</b><ul>{"".join(f"<li>{r}</li>" for r in insights.get("recommandations", []))}</ul></div>
-                <div class="card">{rows_html}</div>
-                </body></html>"""
+            <html lang="fr"><head><meta charset="utf-8">
+            <style>
+            body {{ font-family: sans-serif; background:#0A1628; color:#fff; padding:24px; }}
+            .card {{ background:#0F2038; border-radius:10px; padding:16px; margin-bottom:16px; overflow-x:auto; }}
+            {css}
+            </style></head><body>
+            <h2>{title}</h2>
+            {charts_html}
+            <div class="card"><b>Points clés</b><ul>{"".join(f"<li>{p}</li>" for p in insights.get("points_cles", []))}</ul></div>
+            <div class="card"><b>Anomalies</b><ul>{"".join(f"<li>{a}</li>" for a in insights.get("anomalies", []))}</ul></div>
+            <div class="card"><b>Recommandations</b><ul>{"".join(f"<li>{r}</li>" for r in insights.get("recommandations", []))}</ul></div>
+            <div class="card">{rows_html}</div>
+            </body></html>"""
         return html
 
     #=====================================================
